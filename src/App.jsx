@@ -3,7 +3,7 @@ import TodoInput from './components/molecules/TodoInput';
 import TodoList from './components/molecules/TodoList';
 import TodoFilter from './components/molecules/TodoFilter';
 import ClearCompletedButton from './components/molecules/ClearCompletedButton';
-import Title from './components/atoms/Title';
+
 class App extends Component {
   constructor(props) {
     super(props);
@@ -14,6 +14,18 @@ class App extends Component {
     };
   }
 
+  componentDidMount() {
+    this.fetchTasks();
+  }
+
+  fetchTasks = () => {
+    fetch('http://localhost:3001/tasks')
+      .then((response) => response.json())
+      .then((tasks) => {
+        this.setState({ tasks });
+      });
+  };
+
   handleInputChange = (e) => {
     this.setState({ currentTask: e.target.value });
   };
@@ -21,21 +33,49 @@ class App extends Component {
   addTask = () => {
     if (this.state.currentTask.trim() === '') return;
     const newTask = { text: this.state.currentTask, completed: false };
-    this.setState({
-      tasks: [...this.state.tasks, newTask],
-      currentTask: '',
-    });
+
+    fetch('http://localhost:3001/tasks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(newTask),
+    })
+      .then((response) => response.json())
+      .then(() => {
+        this.setState({ currentTask: '' });
+        this.fetchTasks();
+      });
   };
 
-  toggleComplete = (index) => {
+  toggleComplete = (id) => {
     const updatedTasks = [...this.state.tasks];
-    updatedTasks[index].completed = !updatedTasks[index].completed;
-    this.setState({ tasks: updatedTasks });
+    const taskToUpdate = updatedTasks.find((task) => task.id === id);
+    if (taskToUpdate) {
+      taskToUpdate.completed = !taskToUpdate.completed;
+      fetch(`http://localhost:3001/tasks/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskToUpdate),
+      })
+        .then(() => {
+          this.setState({ tasks: updatedTasks });
+        });
+    }
   };
 
   clearCompleted = () => {
-    const incompleteTasks = this.state.tasks.filter((task) => !task.completed);
-    this.setState({ tasks: incompleteTasks });
+    const completedTasks = this.state.tasks.filter((task) => task.completed);
+    completedTasks.forEach((task) => {
+      fetch(`http://localhost:3001/tasks/${task.id}`, {
+        method: 'DELETE',
+      })
+        .then(() => {
+          this.fetchTasks();
+        });
+    });
   };
 
   changeFilter = (filter) => {
@@ -57,7 +97,7 @@ class App extends Component {
     return (
       <div className='bg-gray-900 min-h-screen font-inter h-full text-gray-100 flex items-center justify-center py-20 px-5'>
         <div className='container flex flex-col max-w-xl gap-4 py-4'>
-          <Title title="To-Do-List" />
+        <h1>Todo List</h1>
           <TodoInput
             currentTask={currentTask}
             handleInputChange={this.handleInputChange}
